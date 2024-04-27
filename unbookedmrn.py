@@ -95,6 +95,29 @@ temp_register_df = fas_h_gst_register.join(fas_d_gst_register,
                                               fas_d_gst_register["DGR_Debit_Job_Code"], 
                                               fas_h_gst_register["HGR_LR_Number"], 
                                               fas_h_gst_register["HGR_GST_Release_Mode"])
+gstin_df = spark.table("edwstg40.MDM.BAM_M_GSTIN")
+temp_register_df = temp_register_df.join(
+    gstin_df,
+    (temp_register_df["BAGSTIN"] == gstin_df["MGST_GST_Number"]) &
+    (temp_register_df["BACode"] == gstin_df["MGST_BA_Code"]) &
+    (temp_register_df["CompanyCode"] == gstin_df["MGST_Company_Code"]),
+    "left"
+).withColumn("TaxpayerCategory", col("MGST_Taxpayer_Type"))
+
+# Update ItemDesc from BOQ_T_Client
+boq_df = spark.table("EDWSTG40.cim.BOQ_T_Client")
+temp_register_df = temp_register_df.join(
+    boq_df,
+    (temp_register_df["JobCode"] == boq_df["BOQ_Job_Code"]) &
+    (temp_register_df["InvoiceType"] == boq_df["BOQ_Invoice_Type"]) &
+    (temp_register_df["BACode"] == boq_df["BOQ_Customer_Code"]) &
+    (temp_register_df["OrderNo"] == boq_df["BOQ_Order_No"]) &
+    (temp_register_df["CurrencyCode"] == boq_df["BOQ_Currency_Code"]) &
+    (col("ItemCode").substr(1, F.expr("case when instr(ItemCode, '-') = 0 then length(ItemCode) else instr(ItemCode, '-') - 1 end")).cast("integer") == boq_df["BOQ_Client_BOQ"]) &
+    (temp_register_df["BRType"] == 1),
+    "left"
+).withColumn("ItemDesc", F.coalesce(boq_df["BOQ_Description"], F.lit("")))
+
 
 # Perform required operations on temp_register_df
 
