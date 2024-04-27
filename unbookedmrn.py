@@ -15,6 +15,10 @@ fas_h_gst_register = spark.table("EDWSTG40.TAX.FAS_H_GST_Register")
 fas_d_gst_register = spark.table("EDWSTG40.TAX.FAS_D_GST_Register")
 fas_d_gst_register_general = spark.table("EDWSTG40.TAX.FAS_D_GST_Register_General")
 stm_m_tax_nature = spark.table("EDWSTG40.MDM.STM_M_Tax_Nature")
+boq_df = spark.table("EDWSTG40.CIM.BOQ_T_Client")
+tender_df = spark.table("EDWSTG40.CIM.BOQ_T_Tender")
+boq_df = spark.table("EDWSTG40.cim.BOQ_T_Client")
+gstin_df = spark.table("edwstg40.MDM.BAM_M_GSTIN")
 
 # Set CompTaxApplicability
 comp_tax_applicability = gen_m_dt_validations \
@@ -161,8 +165,6 @@ temp_register_df = temp_register_df.join(
 ).withColumn("ItemDesc", F.coalesce(recovery_ded_df["MIR_Other_Item_Description"], F.lit("")))
 
 
-
-# Perform required operations on temp_register_df
 
 # Save the result to desired location
 temp_register_df.write.mode("overwrite").parquet("path_to_save_result")
