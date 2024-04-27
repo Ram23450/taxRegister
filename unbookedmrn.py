@@ -118,6 +118,49 @@ temp_register_df = temp_register_df.join(
     "left"
 ).withColumn("ItemDesc", F.coalesce(boq_df["BOQ_Description"], F.lit("")))
 
+# Update ItemDesc from BOQ_T_Client based on BOQ_T_Tender
+boq_df = spark.table("EDWSTG40.CIM.BOQ_T_Client")
+tender_df = spark.table("EDWSTG40.CIM.BOQ_T_Tender")
+temp_register_df = temp_register_df.join(
+    boq_df,
+    temp_register_df["JobCode"] == boq_df["BOQ_Job_Code"],
+    "left"
+).join(
+    tender_df,
+    (boq_df["TBOQ_Job_Code"] == tender_df["BOQ_Job_Code"]) &
+    (boq_df["TBOQ_Invoice_Type"] == tender_df["BOQ_Invoice_Type"]) &
+    (boq_df["TBOQ_Customer_Code"] == tender_df["BOQ_Customer_Code"]) &
+    (boq_df["TBOQ_Order_No"] == tender_df["BOQ_Order_No"]) &
+    (boq_df["TBOQ_Client_BOQ_Code"] == tender_df["BOQ_Client_BOQ"]),
+    "inner"
+).filter(
+    F.trim(F.substring(temp_register_df["ItemCode"], 1, F.expr("case when instr(ItemCode, '-') = 0 then length(ItemCode) else instr(ItemCode, '-') - 1 end"))) == F.trim(tender_df["TBOQ_Tender_Code"]) &
+    (temp_register_df["BACode"] == boq_df["BOQ_Customer_Code"]) &
+    (temp_register_df["OrderNo"] == boq_df["BOQ_Order_No"]) &
+    (temp_register_df["BRType"] == 1)
+).withColumn("ItemDesc", F.coalesce(boq_df["BOQ_Description"], F.lit("")))
+
+# Update ItemDesc from MAS_M_Recovery for items ending with '-Adv'
+recovery_adv_df = spark.table("EDWSTG40.CIM.MAS_M_Recovery").filter(col("MIR_Other_Item_Code").endswith("-Adv"))
+temp_register_df = temp_register_df.join(
+    recovery_adv_df,
+    temp_register_df["ItemCode"] == recovery_adv_df["MIR_Other_Item_Code"],
+    "left"
+).filter(
+    temp_register_df["BRType"] == 1
+).withColumn("ItemDesc", F.coalesce(recovery_adv_df["MIR_Other_Item_Description"], F.lit("")))
+
+# Update ItemDesc from MAS_M_Recovery for items ending with '-ded'
+recovery_ded_df = spark.table("EDWSTG40.CIM.MAS_M_Recovery").filter(col("MIR_Other_Item_Code").endswith("-ded"))
+temp_register_df = temp_register_df.join(
+    recovery_ded_df,
+    temp_register_df["ItemCode"] == recovery_ded_df["MIR_Other_Item_Code"],
+    "left"
+).filter(
+    temp_register_df["BRType"] == 1
+).withColumn("ItemDesc", F.coalesce(recovery_ded_df["MIR_Other_Item_Description"], F.lit("")))
+
+
 
 # Perform required operations on temp_register_df
 
